@@ -2,7 +2,10 @@ import { promises as fs } from 'fs';
 import { Request, Response } from 'express';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
-import { StructuredJobDescription } from '../services/jobDescriptionParserService';
+import {
+  parseJobDescriptionText,
+  StructuredJobDescription,
+} from '../services/jobDescriptionParserService';
 import { tailorResumeToJobDescription } from '../services/openAiIntegrationService';
 import { parseResumeText } from '../services/resumeParserService';
 import { StructuredResume } from '../services/resumeParserService';
@@ -58,6 +61,19 @@ export const structureResumeText = (req: Request, res: Response): void => {
   const structuredResume = parseResumeText(text);
 
   res.status(200).json(structuredResume);
+};
+
+export const structureJobDescriptionText = (req: Request, res: Response): void => {
+  const { text } = req.body as { text?: unknown };
+
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    res.status(400).json({ message: 'A non-empty text string is required' });
+    return;
+  }
+
+  const structuredJobDescription = parseJobDescriptionText(text);
+
+  res.status(200).json(structuredJobDescription);
 };
 
 const isStringArray = (value: unknown): value is string[] =>
@@ -134,5 +150,65 @@ export const tailorResume = async (req: Request, res: Response): Promise<void> =
       message: 'Failed to tailor resume to the job description.',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+};
+
+export const analyzeResumeAgainstJob = async (req: Request, res: Response): Promise<void> => {
+  const { jobDescription } = req.body as { jobDescription?: unknown };
+
+  if (!req.file) {
+    res.status(400).json({ message: 'No resume file uploaded.' });
+    return;
+  }
+
+  if (typeof jobDescription !== 'string' || jobDescription.trim().length === 0) {
+    res.status(400).json({ message: 'A non-empty jobDescription field is required.' });
+    return;
+  }
+
+  const { path: filePath, mimetype, originalname } = req.file;
+
+  try {
+    const extractedResumeText =
+      mimetype === 'application/pdf'
+        ? await extractTextFromPdf(filePath)
+        : await extractTextFromDocx(filePath);
+
+    const structuredResume = parseResumeText(extractedResumeText);
+    const structuredJobDescription = parseJobDescriptionText(jobDescription);
+    const scoreResult = scoreResumeAgainstJob(structuredResume, structuredJobDescription);
+
+    const optimizedResume = process.env.OPENAI_API_KEY
+      ? await tailorResumeToJobDescription(structuredResume, structuredJobDescription)
+      : structuredResume;
+
+    const optimizedResumeText = [
+      optimizedResume.summary,
+      ...optimizedResume.workExperience,
+      ...optimizedResume.skills,
+      ...optimizedResume.education,
+      ...optimizedResume.certifications,
+    ]
+      .filter((line) => line.trim().length > 0)
+      .join('\n');
+
+    res.status(200).json({
+      fileName: originalname,
+      structuredResume,
+      structuredJobDescription,
+      atsScore: scoreResult.score,
+      matchedKeywords: scoreResult.matchedKeywords,
+      missingKeywords: scoreResult.missingKeywords,
+      suggestedBulletImprovements: scoreResult.improvementSuggestions,
+      optimizedResume,
+      optimizedResumeText,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Failed to analyze resume against the job description.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  } finally {
+    await fs.unlink(filePath).catch(() => undefined);
   }
 };
