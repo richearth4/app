@@ -139,13 +139,19 @@ const countTokens = (rawText: string): Map<string, number> => {
   return counts;
 };
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildAliasPattern = (alias: string): RegExp => {
+  const escapedAlias = escapeRegExp(alias.toLowerCase());
+  return new RegExp(`(^|[^a-z0-9])${escapedAlias}(?=$|[^a-z0-9])`, 'gi');
+};
+
 const extractRequiredSkills = (rawText: string, tokenCounts: Map<string, number>): string[] => {
   const loweredText = rawText.toLowerCase();
   const scoredSkills = Object.entries(SKILL_ALIASES)
     .map(([skill, aliases]) => {
       const score = aliases.reduce((total, alias) => {
-        const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const aliasPattern = new RegExp(`\\b${escapedAlias}\\b`, 'gi');
+        const aliasPattern = buildAliasPattern(alias);
         const aliasHits = (loweredText.match(aliasPattern) ?? []).length;
         const fallbackTokenScore = tokenCounts.get(alias.toLowerCase()) ?? 0;
         return total + aliasHits + fallbackTokenScore;
