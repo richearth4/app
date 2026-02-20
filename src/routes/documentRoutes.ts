@@ -3,7 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import os from 'os';
 import path from 'path';
-import { uploadDocument } from '../controllers/documentController';
+import { structureResumeText, uploadDocument } from '../controllers/documentController';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
@@ -54,5 +54,7 @@ documentRouter.post('/upload', (req, res) => {
     void uploadDocument(req, res);
   });
 });
+
+documentRouter.post('/structure', structureResumeText);
 
 export default documentRouter;
