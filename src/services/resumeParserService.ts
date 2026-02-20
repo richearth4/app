@@ -23,6 +23,20 @@ const SECTION_PATTERNS: Array<{ key: ResumeSectionKey; pattern: RegExp }> = [
 ];
 
 const BULLET_PREFIX = /^[-•*·‣▪◦]\s*/;
+const WORK_DATE_RANGE =
+  /\b(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+)?\d{4}\s*[-–]\s*(?:present|current|\d{4})\b/i;
+
+const looksLikeWorkHeader = (line: string): boolean => {
+  if (WORK_DATE_RANGE.test(line)) {
+    return true;
+  }
+
+  if (/^[^|]{2,80}\|[^|]{2,80}(?:\|[^|]{2,80})?$/.test(line)) {
+    return true;
+  }
+
+  return /^[^,]{2,80}\s+(?:at|@)\s+[^,]{2,80}(?:\s*[-–|]\s*.+)?$/i.test(line);
+};
 
 const normalizeLines = (rawText: string): string[] =>
   rawText
@@ -91,10 +105,7 @@ const toEntries = (lines: string[]): string[] => {
       continue;
     }
 
-    const startsNewEntry =
-      /^\d{4}\s*[-–]\s*(\d{4}|present)/i.test(cleanLine) ||
-      /\b(at|with)\b/i.test(cleanLine) ||
-      BULLET_PREFIX.test(line);
+    const startsNewEntry = looksLikeWorkHeader(cleanLine);
 
     if (startsNewEntry && currentEntry.length > 0) {
       entries.push(currentEntry.join(' ').trim());
