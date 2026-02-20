@@ -4,7 +4,9 @@ import multer from 'multer';
 import os from 'os';
 import path from 'path';
 import {
+  analyzeResumeAgainstJob,
   scoreResume,
+  structureJobDescriptionText,
   structureResumeText,
   tailorResume,
   uploadDocument,
@@ -61,9 +63,30 @@ documentRouter.post('/upload', (req, res) => {
 });
 
 documentRouter.post('/structure', structureResumeText);
+documentRouter.post('/job-description', structureJobDescriptionText);
 documentRouter.post('/score', scoreResume);
 documentRouter.post('/tailor', (req, res) => {
   void tailorResume(req, res);
+});
+documentRouter.post('/analyze', (req, res) => {
+  upload.single('resume')(req, res, (error: unknown) => {
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ message: 'File size exceeds 5MB limit' });
+        return;
+      }
+
+      res.status(400).json({ message: error.message });
+      return;
+    }
+
+    if (error instanceof Error) {
+      res.status(400).json({ message: error.message });
+      return;
+    }
+
+    void analyzeResumeAgainstJob(req, res);
+  });
 });
 
 export default documentRouter;

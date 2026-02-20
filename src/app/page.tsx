@@ -10,17 +10,7 @@ type AnalysisResult = {
   optimizedResumeText: string;
 };
 
-const fallbackResult: AnalysisResult = {
-  atsScore: 78,
-  matchedKeywords: ['TypeScript', 'REST APIs', 'Agile', 'Unit Testing', 'Node.js'],
-  missingKeywords: ['Kubernetes', 'CI/CD', 'Microservices'],
-  suggestedBulletImprovements: [
-    'Built and maintained 12 RESTful APIs in Node.js, reducing response times by 35%.',
-    'Improved test coverage from 48% to 87% by introducing automated unit and integration tests.',
-    'Collaborated with product and design teams in Agile sprints to deliver 9 key features on time.',
-  ],
-  optimizedResumeText: `Jane Doe\nSoftware Engineer\n\nOptimized Highlights\n• Built and maintained 12 RESTful APIs in Node.js, reducing response times by 35%.\n• Improved test coverage from 48% to 87% by introducing automated unit and integration tests.\n• Collaborated with product and design teams in Agile sprints to deliver 9 key features on time.`,
-};
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 export default function ResumeMatchPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -66,28 +56,20 @@ export default function ResumeMatchPage() {
       formData.append('resume', resumeFile);
       formData.append('jobDescription', jobDescription);
 
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(`${apiBaseUrl}/documents/analyze`, {
         method: 'POST',
         body: formData,
       });
 
-      if (response.ok) {
-        const responseData = (await response.json()) as Partial<AnalysisResult>;
-
-        setResult({
-          atsScore: responseData.atsScore ?? fallbackResult.atsScore,
-          matchedKeywords: responseData.matchedKeywords ?? fallbackResult.matchedKeywords,
-          missingKeywords: responseData.missingKeywords ?? fallbackResult.missingKeywords,
-          suggestedBulletImprovements:
-            responseData.suggestedBulletImprovements ?? fallbackResult.suggestedBulletImprovements,
-          optimizedResumeText: responseData.optimizedResumeText ?? fallbackResult.optimizedResumeText,
-        });
-        return;
+      if (!response.ok) {
+        const responseData = (await response.json()) as { message?: string };
+        throw new Error(responseData.message ?? 'Resume analysis failed.');
       }
 
-      setResult(fallbackResult);
-    } catch (_submitError) {
-      setResult(fallbackResult);
+      const responseData = (await response.json()) as AnalysisResult;
+      setResult(responseData);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Resume analysis failed.');
     } finally {
       setIsLoading(false);
     }

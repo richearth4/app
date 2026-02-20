@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: resume-matcher-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+
+  - type: web
+    name: resume-matcher-frontend
+    env: static
+    staticPublishPath: .
+    buildCommand: echo "Deploy the Next.js frontend from its own repository or Vercel."
