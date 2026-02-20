@@ -130,7 +130,12 @@ const countTokens = (rawText: string): Map<string, number> => {
     .toLowerCase()
     .replace(/[^a-z0-9+#/.\s-]/g, ' ')
     .split(/\s+/)
-    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+    .filter(
+      (token) =>
+        token.length > 0 &&
+        (token.length > 2 || /[^a-z0-9]/i.test(token)) &&
+        !STOP_WORDS.has(token),
+    );
 
   for (const token of tokens) {
     counts.set(token, (counts.get(token) ?? 0) + 1);
@@ -143,7 +148,12 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
 
 const buildAliasPattern = (alias: string): RegExp => {
   const escapedAlias = escapeRegExp(alias.toLowerCase());
-  return new RegExp(`(^|[^a-z0-9])${escapedAlias}(?=$|[^a-z0-9])`, 'gi');
+  const startsWithAlphaNumeric = /^[a-z0-9]/i.test(alias);
+  const endsWithAlphaNumeric = /[a-z0-9]$/i.test(alias);
+  const leftBoundary = startsWithAlphaNumeric ? '(?<![a-z0-9])' : '';
+  const rightBoundary = endsWithAlphaNumeric ? '(?![a-z0-9])' : '';
+
+  return new RegExp(`${leftBoundary}${escapedAlias}${rightBoundary}`, 'gi');
 };
 
 const extractRequiredSkills = (rawText: string, tokenCounts: Map<string, number>): string[] => {
