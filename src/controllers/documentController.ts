@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import { Request, Response } from 'express';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
+import { parseResumeText } from '../services/resumeParserService';
 
 const extractTextFromPdf = async (filePath: string): Promise<string> => {
   const fileBuffer = await fs.readFile(filePath);
@@ -40,4 +41,17 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
   } finally {
     await fs.unlink(filePath).catch(() => undefined);
   }
+};
+
+export const structureResumeText = (req: Request, res: Response): void => {
+  const { text } = req.body as { text?: unknown };
+
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    res.status(400).json({ message: 'A non-empty text string is required' });
+    return;
+  }
+
+  const structuredResume = parseResumeText(text);
+
+  res.status(200).json(structuredResume);
 };
