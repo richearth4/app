@@ -3,7 +3,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import os from 'os';
 import path from 'path';
-import { scoreResume, structureResumeText, uploadDocument } from '../controllers/documentController';
+import {
+  scoreResume,
+  structureResumeText,
+  tailorResume,
+  uploadDocument,
+} from '../controllers/documentController';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
@@ -57,5 +62,8 @@ documentRouter.post('/upload', (req, res) => {
 
 documentRouter.post('/structure', structureResumeText);
 documentRouter.post('/score', scoreResume);
+documentRouter.post('/tailor', (req, res) => {
+  void tailorResume(req, res);
+});
 
 export default documentRouter;

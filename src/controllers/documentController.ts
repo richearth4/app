@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 import { StructuredJobDescription } from '../services/jobDescriptionParserService';
+import { tailorResumeToJobDescription } from '../services/openAiIntegrationService';
 import { parseResumeText } from '../services/resumeParserService';
 import { StructuredResume } from '../services/resumeParserService';
 import { scoreResumeAgainstJob } from '../services/scoringService';
@@ -109,4 +110,29 @@ export const scoreResume = (req: Request, res: Response): void => {
 
   const result = scoreResumeAgainstJob(resume, jobDescription);
   res.status(200).json(result);
+};
+
+export const tailorResume = async (req: Request, res: Response): Promise<void> => {
+  const { resume, jobDescription } = req.body as {
+    resume?: unknown;
+    jobDescription?: unknown;
+  };
+
+  if (!isStructuredResume(resume) || !isStructuredJobDescription(jobDescription)) {
+    res.status(400).json({
+      message:
+        'Payload must include valid structured `resume` and `jobDescription` JSON objects.',
+    });
+    return;
+  }
+
+  try {
+    const updatedResume = await tailorResumeToJobDescription(resume, jobDescription);
+    res.status(200).json(updatedResume);
+  } catch (error) {
+    res.status(502).json({
+      message: 'Failed to tailor resume to the job description.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 };
