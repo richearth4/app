@@ -149,9 +149,8 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
 const buildAliasPattern = (alias: string): RegExp => {
   const escapedAlias = escapeRegExp(alias.toLowerCase());
   const startsWithAlphaNumeric = /^[a-z0-9]/i.test(alias);
-  const endsWithAlphaNumeric = /[a-z0-9]$/i.test(alias);
   const leftBoundary = startsWithAlphaNumeric ? '(?<![a-z0-9])' : '';
-  const rightBoundary = endsWithAlphaNumeric ? '(?![a-z0-9])' : '';
+  const rightBoundary = '(?![a-z0-9])';
 
   return new RegExp(`${leftBoundary}${escapedAlias}${rightBoundary}`, 'gi');
 };
