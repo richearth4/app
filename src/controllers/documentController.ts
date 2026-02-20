@@ -2,7 +2,10 @@ import { promises as fs } from 'fs';
 import { Request, Response } from 'express';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
+import { StructuredJobDescription } from '../services/jobDescriptionParserService';
 import { parseResumeText } from '../services/resumeParserService';
+import { StructuredResume } from '../services/resumeParserService';
+import { scoreResumeAgainstJobDescription } from '../services/resumeScoringService';
 
 const extractTextFromPdf = async (filePath: string): Promise<string> => {
   const fileBuffer = await fs.readFile(filePath);
@@ -54,4 +57,19 @@ export const structureResumeText = (req: Request, res: Response): void => {
   const structuredResume = parseResumeText(text);
 
   res.status(200).json(structuredResume);
+};
+
+export const scoreResumeMatch = (req: Request, res: Response): void => {
+  const { resume, jobDescription } = req.body as {
+    resume?: StructuredResume;
+    jobDescription?: StructuredJobDescription;
+  };
+
+  if (!resume || !jobDescription) {
+    res.status(400).json({ message: 'Both resume and jobDescription JSON objects are required' });
+    return;
+  }
+
+  const scoreResult = scoreResumeAgainstJobDescription(resume, jobDescription);
+  res.status(200).json(scoreResult);
 };
