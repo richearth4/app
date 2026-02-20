@@ -36,6 +36,11 @@ interface ResponsesApiResult {
   model?: string;
 }
 
+export interface ResumeBulletOptimization {
+  original: string;
+  optimized: string;
+}
+
 const DEFAULT_MODEL = 'gpt-4.1-mini';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_MAX_OUTPUT_TOKENS = 350;
@@ -170,4 +175,69 @@ export const requestStructuredJson = async <T>(
   }
 
   throw new Error(`Failed to get structured JSON response from OpenAI: ${String(lastError)}`);
+};
+
+interface OptimizeResumeBulletsResponse {
+  bulletPoints: ResumeBulletOptimization[];
+}
+
+const optimizeResumeBulletsSchema: JsonSchema = {
+  name: 'optimized_resume_bullets',
+  description: 'Improved resume bullet points with stronger language and measurable impact where appropriate.',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['bulletPoints'],
+    properties: {
+      bulletPoints: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['original', 'optimized'],
+          properties: {
+            original: { type: 'string' },
+            optimized: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const optimizeResumeBulletPoints = async (
+  bulletPoints: string[],
+): Promise<ResumeBulletOptimization[]> => {
+  const normalizedBullets = bulletPoints.map((bullet) => bullet.trim()).filter(Boolean);
+
+  if (normalizedBullets.length === 0) {
+    return [];
+  }
+
+  const systemPrompt = `You are an expert resume writer. Improve each resume bullet point while preserving factual accuracy.
+Follow these rules:
+- Improve clarity
+- Add measurable impact when reasonable and grounded in the original statement
+- Use strong action verbs
+- Avoid exaggeration
+- Preserve factual accuracy
+Return JSON matching the schema exactly.`;
+
+  const userPrompt = `Optimize the following resume bullet points:\n${normalizedBullets
+    .map((bullet, index) => `${index + 1}. ${bullet}`)
+    .join('\n')}`;
+
+  const response = await requestStructuredJson<OptimizeResumeBulletsResponse>({
+    systemPrompt,
+    userPrompt,
+    responseSchema: optimizeResumeBulletsSchema,
+    maxOutputTokens: 700,
+  });
+
+  if (response.data.bulletPoints.length !== normalizedBullets.length) {
+    throw new Error('OpenAI returned a different number of bullet points than requested.');
+  }
+
+  return response.data.bulletPoints;
 };
