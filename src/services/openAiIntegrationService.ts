@@ -1,3 +1,6 @@
+import { StructuredJobDescription } from './jobDescriptionParserService';
+import { StructuredResume } from './resumeParserService';
+
 interface JsonSchema {
   name: string;
   schema: Record<string, unknown>;
@@ -181,6 +184,10 @@ interface OptimizeResumeBulletsResponse {
   bulletPoints: ResumeBulletOptimization[];
 }
 
+interface TailoredResumeResponse {
+  resume: StructuredResume;
+}
+
 const optimizeResumeBulletsSchema: JsonSchema = {
   name: 'optimized_resume_bullets',
   description: 'Improved resume bullet points with stronger language and measurable impact where appropriate.',
@@ -199,6 +206,44 @@ const optimizeResumeBulletsSchema: JsonSchema = {
           properties: {
             original: { type: 'string' },
             optimized: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+};
+
+const tailoredResumeSchema: JsonSchema = {
+  name: 'tailored_resume',
+  description:
+    'Structured resume tailored to a specific job description while preserving factual accuracy.',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['resume'],
+    properties: {
+      resume: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['summary', 'workExperience', 'skills', 'education', 'certifications'],
+        properties: {
+          summary: { type: 'string' },
+          workExperience: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          skills: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          education: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          certifications: {
+            type: 'array',
+            items: { type: 'string' },
           },
         },
       },
@@ -240,4 +285,37 @@ Return JSON matching the schema exactly.`;
   }
 
   return response.data.bulletPoints;
+};
+
+export const tailorResumeToJobDescription = async (
+  resume: StructuredResume,
+  jobDescription: StructuredJobDescription,
+): Promise<StructuredResume> => {
+  const systemPrompt = `You are an expert resume strategist.
+Rewrite a structured resume so it aligns with a target job description for ATS systems.
+Follow these rules exactly:
+- Keep all content truthful and grounded in the original resume
+- Do not invent employers, titles, degrees, certifications, metrics, tools, or dates
+- Improve wording to align with job requirements and keywords
+- Prioritize natural keyword coverage over keyword stuffing
+- Keep a professional tone and concise bullet points
+- Preserve JSON structure exactly
+Return JSON matching the schema exactly.`;
+
+  const userPrompt = `Original structured resume JSON:
+${JSON.stringify(resume, null, 2)}
+
+Target structured job description JSON:
+${JSON.stringify(jobDescription, null, 2)}
+
+Produce an updated resume JSON that better aligns with the job description while staying fully truthful to the original resume.`;
+
+  const response = await requestStructuredJson<TailoredResumeResponse>({
+    systemPrompt,
+    userPrompt,
+    responseSchema: tailoredResumeSchema,
+    maxOutputTokens: 1200,
+  });
+
+  return response.data.resume;
 };
