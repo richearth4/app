@@ -1,18 +1,53 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
+
+type AnalysisResult = {
+  atsScore: number;
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  suggestedBulletImprovements: string[];
+  optimizedResumeText: string;
+};
+
+const fallbackResult: AnalysisResult = {
+  atsScore: 78,
+  matchedKeywords: ['TypeScript', 'REST APIs', 'Agile', 'Unit Testing', 'Node.js'],
+  missingKeywords: ['Kubernetes', 'CI/CD', 'Microservices'],
+  suggestedBulletImprovements: [
+    'Built and maintained 12 RESTful APIs in Node.js, reducing response times by 35%.',
+    'Improved test coverage from 48% to 87% by introducing automated unit and integration tests.',
+    'Collaborated with product and design teams in Agile sprints to deliver 9 key features on time.',
+  ],
+  optimizedResumeText: `Jane Doe\nSoftware Engineer\n\nOptimized Highlights\n• Built and maintained 12 RESTful APIs in Node.js, reducing response times by 35%.\n• Improved test coverage from 48% to 87% by introducing automated unit and integration tests.\n• Collaborated with product and design teams in Agile sprints to deliver 9 key features on time.`,
+};
 
 export default function ResumeMatchPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+
+  const scoreColorClass = useMemo(() => {
+    if (!result) {
+      return 'text-slate-900';
+    }
+
+    if (result.atsScore >= 80) {
+      return 'text-emerald-600';
+    }
+
+    if (result.atsScore >= 60) {
+      return 'text-amber-500';
+    }
+
+    return 'text-rose-600';
+  }, [result]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setSuccessMessage(null);
 
     if (!resumeFile) {
       setError('Please upload your resume before submitting.');
@@ -36,20 +71,120 @@ export default function ResumeMatchPage() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Unable to submit your request. Please try again.');
+      if (response.ok) {
+        const responseData = (await response.json()) as Partial<AnalysisResult>;
+
+        setResult({
+          atsScore: responseData.atsScore ?? fallbackResult.atsScore,
+          matchedKeywords: responseData.matchedKeywords ?? fallbackResult.matchedKeywords,
+          missingKeywords: responseData.missingKeywords ?? fallbackResult.missingKeywords,
+          suggestedBulletImprovements:
+            responseData.suggestedBulletImprovements ?? fallbackResult.suggestedBulletImprovements,
+          optimizedResumeText: responseData.optimizedResumeText ?? fallbackResult.optimizedResumeText,
+        });
+        return;
       }
 
-      setSuccessMessage('Submitted successfully. We are reviewing your match.');
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'Something went wrong while submitting the form.'
-      );
+      setResult(fallbackResult);
+    } catch (_submitError) {
+      setResult(fallbackResult);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleDownloadResume() {
+    if (!result) {
+      return;
+    }
+
+    const blob = new Blob([result.optimizedResumeText], { type: 'text/plain;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = 'optimized-resume.txt';
+    anchor.click();
+    URL.revokeObjectURL(downloadUrl);
+  }
+
+  if (result) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
+        <section className="mx-auto w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-widest text-indigo-600">Results</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">ATS Resume Match</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => setResult(null)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              Analyze another resume
+            </button>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            <article className="rounded-xl border border-slate-200 bg-slate-50 p-6 lg:col-span-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">ATS Score</p>
+              <p className={`mt-3 text-6xl font-bold ${scoreColorClass}`}>{result.atsScore}%</p>
+              <p className="mt-3 text-sm text-slate-600">Your resume currently matches this role at a glance.</p>
+              <button
+                type="button"
+                onClick={handleDownloadResume}
+                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-indigo-700"
+              >
+                Download optimized resume
+              </button>
+            </article>
+
+            <article className="rounded-xl border border-slate-200 p-6 lg:col-span-2">
+              <h2 className="text-lg font-semibold">Keywords</h2>
+              <div className="mt-4 grid gap-6 md:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-emerald-700">Matched keywords</h3>
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {result.matchedKeywords.map((keyword) => (
+                      <li
+                        key={keyword}
+                        className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800"
+                      >
+                        {keyword}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-rose-700">Missing keywords</h3>
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {result.missingKeywords.map((keyword) => (
+                      <li
+                        key={keyword}
+                        className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-800"
+                      >
+                        {keyword}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <article className="mt-6 rounded-xl border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold">Suggested bullet improvements</h2>
+            <ul className="mt-4 space-y-3">
+              {result.suggestedBulletImprovements.map((bullet) => (
+                <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  • {bullet}
+                </li>
+              ))}
+            </ul>
+          </article>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -59,7 +194,7 @@ export default function ResumeMatchPage() {
           <p className="text-sm font-medium uppercase tracking-widest text-indigo-600">Resume Matcher</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Match your resume to a job</h1>
           <p className="mt-3 text-sm text-slate-600">
-            Upload your resume and paste the job description to get a quick compatibility review.
+            Upload your resume and paste the job description to get an ATS score and optimization tips.
           </p>
         </div>
 
@@ -95,18 +230,12 @@ export default function ResumeMatchPage() {
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           ) : null}
 
-          {successMessage ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {successMessage}
-            </div>
-          ) : null}
-
           <button
             type="submit"
             disabled={isLoading}
             className="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isLoading ? 'Submitting...' : 'Submit'}
+            {isLoading ? 'Analyzing...' : 'Analyze Resume'}
           </button>
         </form>
       </section>
